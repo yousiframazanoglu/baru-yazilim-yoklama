@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BARÜ Yazılım Birimi — Yoklama QR</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --line: #2a2e37;
+    --text: #eef0f3;
+    --muted: #9aa3af;
+    --amber: #ffb648;
+    --cyan: #5ec8d8;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    --sans: "Inter", -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(255, 182, 72, 0.06), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(94, 200, 216, 0.05), transparent 45%);
+    color: var(--text);
+    font-family: var(--sans);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+  }
+  .wrap {
+    width: 100%;
+    max-width: 560px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--cyan);
+  }
+  h1 {
+    font-size: clamp(22px, 4vw, 30px);
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.25;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7);
+  }
+  #qr { line-height: 0; }
+  #qr img { display: block; }
+  .hint {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .hint .amber { color: var(--amber); }
+  .url {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="kicker">BARÜ Bilim ve Teknoloji Kulübü · Yazılım Birimi</div>
+    <h1>Yoklama için telefonla okut</h1>
+    <div class="card"><div id="qr"></div></div>
+    <div class="hint"><span class="amber">&gt;</span> Öğrenci No ve Ad Soyad'ını gir, gönder.</div>
+    <a class="url" id="urlLabel"></a>
+  </div>
+
+  <script>
+    var target = new URL("./", window.location.href).href;
+    var urlLabel = document.getElementById("urlLabel");
+    urlLabel.textContent = target;
+    urlLabel.href = target;
+
+    if (window.QRCode) {
+      new QRCode(document.getElementById("qr"), {
+        text: target,
+        width: 280,
+        height: 280,
+        colorDark: "#0f1115",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } else {
+      document.getElementById("qr").outerHTML =
+        '<div style="width:280px;height:280px;display:flex;align-items:center;' +
+        'justify-content:center;text-align:center;color:#0f1115;font-family:Inter,sans-serif;' +
+        'font-size:14px;padding:16px;">QR kodu yüklenemedi.<br>Linki yukarıdan aç.</div>';
+    }
+  </script>
+</body>
+</html>

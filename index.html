@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BARÜ Yazılım Birimi — Yoklama</title>
+<meta name="description" content="BARÜ Bilim ve Teknoloji Kulübü Yazılım Birimi yoklama ekranı.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <main class="stage">
+    <div class="term" id="term">
+      <div class="term__bar">
+        <span class="term__tab">yoklama.sh</span>
+        <span class="term__status" id="statusDot" aria-hidden="true"></span>
+      </div>
+
+      <div class="term__body">
+        <div class="term__banner">
+          <span class="term__prompt">$</span> ./yoklama --birim="yazilim"
+        </div>
+
+        <form id="form" class="term__form" autocomplete="off" novalidate>
+          <div class="field">
+            <label class="field__prompt" for="studentNo"><span class="caret">&gt;</span> Öğrenci No:</label>
+            <input
+              id="studentNo"
+              name="studentNo"
+              class="field__input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="2601010001"
+              maxlength="20"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label class="field__prompt" for="fullName"><span class="caret">&gt;</span> Ad Soyad:</label>
+            <input
+              id="fullName"
+              name="fullName"
+              class="field__input"
+              type="text"
+              placeholder="Ahmet Yılmaz"
+              maxlength="80"
+              required
+            >
+          </div>
+
+          <button type="submit" class="submit" id="submitBtn">
+            <span class="submit__caret">▸</span> Gönder
+          </button>
+        </form>
+
+        <div class="output" id="output" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <p class="footnote">BARÜ Bilim ve Teknoloji Kulübü &middot; Yazılım Birimi</p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
