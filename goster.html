@@ -18,6 +18,7 @@
     --muted: #9aa3af;
     --amber: #ffb648;
     --cyan: #5ec8d8;
+    --danger: #ff6b6b;
     --mono: "JetBrains Mono", ui-monospace, monospace;
     --sans: "Inter", -apple-system, sans-serif;
   }
@@ -43,7 +44,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 22px;
+    gap: 18px;
   }
   .kicker {
     font-family: var(--mono);
@@ -61,55 +62,163 @@
     border-radius: 16px;
     padding: 20px;
     box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7);
+    position: relative;
   }
   #qr { line-height: 0; }
   #qr img { display: block; }
+  .card.is-expired #qr { opacity: 0.15; filter: blur(2px); }
   .hint {
     font-family: var(--mono);
     font-size: 15px;
     color: var(--muted);
   }
   .hint .amber { color: var(--amber); }
-  .url {
+  .countdown {
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 14px;
     color: var(--muted);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 6px 14px;
-    text-decoration: none;
   }
+  .countdown .time { color: var(--text); font-weight: 700; }
+  .countdown.is-low .time { color: var(--amber); }
+  .geo {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .geo .on { color: #8fd98a; }
+  .geo .off { color: var(--danger); }
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="kicker">BARÜ Bilim ve Teknoloji Kulübü · Yazılım Birimi</div>
     <h1>Yoklama için telefonla okut</h1>
-    <div class="card"><div id="qr"></div></div>
+    <div class="card" id="card"><div id="qr"></div></div>
     <div class="hint"><span class="amber">&gt;</span> Öğrenci No ve Ad Soyad'ını gir, gönder.</div>
-    <a class="url" id="urlLabel"></a>
+    <div class="countdown" id="countdown"></div>
+    <div class="geo" id="geo"></div>
   </div>
 
+  <script src="config.js"></script>
   <script>
-    var target = new URL("./", window.location.href).href;
-    var urlLabel = document.getElementById("urlLabel");
-    urlLabel.textContent = target;
-    urlLabel.href = target;
+    var TOKEN_TTL_MS = 20 * 60 * 1000; // Code.gs'teki TOKEN_TTL_MS ile aynı tut
+    var ENDPOINT = window.YOKLAMA_ENDPOINT || null;
 
-    if (window.QRCode) {
-      new QRCode(document.getElementById("qr"), {
-        text: target,
-        width: 280,
-        height: 280,
-        colorDark: "#0f1115",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.M
-      });
-    } else {
-      document.getElementById("qr").outerHTML =
+    var qrEl = document.getElementById("qr");
+    var cardEl = document.getElementById("card");
+    var countdownEl = document.getElementById("countdown");
+    var geoEl = document.getElementById("geo");
+
+    var session = { token: null, expiresAt: 0, lat: null, lng: null };
+    var countdownTimer = null;
+
+    function baseUrl() {
+      return new URL("./", window.location.href).href;
+    }
+
+    function drawQr(url) {
+      qrEl.innerHTML = "";
+      if (window.QRCode) {
+        new QRCode(qrEl, {
+          text: url,
+          width: 280,
+          height: 280,
+          colorDark: "#0f1115",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } else {
+        qrEl.outerHTML =
+          '<div style="width:280px;height:280px;display:flex;align-items:center;' +
+          'justify-content:center;text-align:center;color:#0f1115;font-family:Inter,sans-serif;' +
+          'font-size:14px;padding:16px;">QR kodu yüklenemedi.<br>' + url + '</div>';
+      }
+    }
+
+    function randomToken() {
+      return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    }
+
+    function notifyServer() {
+      if (!ENDPOINT || ENDPOINT.indexOf("REPLACE_WITH") === 0) return;
+      try {
+        fetch(ENDPOINT, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "startSession",
+            token: session.token,
+            expiresAt: session.expiresAt,
+            lat: session.lat,
+            lng: session.lng
+          })
+        });
+      } catch (err) {
+        // sessizce geç — bir sonraki döngüde tekrar denenecek
+      }
+    }
+
+    function startNewSession() {
+      session.token = randomToken();
+      session.expiresAt = Date.now() + TOKEN_TTL_MS;
+      cardEl.classList.remove("is-expired");
+
+      var url = baseUrl() + "?t=" + encodeURIComponent(session.token);
+      drawQr(url);
+      notifyServer();
+      tickCountdown();
+    }
+
+    function tickCountdown() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(function () {
+        var remaining = session.expiresAt - Date.now();
+        if (remaining <= 0) {
+          clearInterval(countdownTimer);
+          cardEl.classList.add("is-expired");
+          countdownEl.innerHTML = "QR yenileniyor…";
+          setTimeout(startNewSession, 800);
+          return;
+        }
+        var m = Math.floor(remaining / 60000);
+        var s = Math.floor((remaining % 60000) / 1000);
+        countdownEl.classList.toggle("is-low", remaining < 60000);
+        countdownEl.innerHTML =
+          'Bu QR <span class="time">' + m + ":" + (s < 10 ? "0" : "") + s + "</span> sonra yenilenecek";
+      }, 1000);
+    }
+
+    function setupGeo() {
+      if (!navigator.geolocation) {
+        geoEl.innerHTML = '<span class="off">✗ Konum kontrolü kapalı (tarayıcı desteklemiyor)</span>';
+        startNewSession();
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          session.lat = pos.coords.latitude;
+          session.lng = pos.coords.longitude;
+          geoEl.innerHTML = '<span class="on">✓ Konum kontrolü açık — öğrenciler sınıfın yakınında olmalı</span>';
+          startNewSession();
+        },
+        function () {
+          session.lat = null;
+          session.lng = null;
+          geoEl.innerHTML = '<span class="off">✗ Konum kontrolü kapalı (izin verilmedi) — bu ekrana konum izni ver</span>';
+          startNewSession();
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    if (!ENDPOINT || ENDPOINT.indexOf("REPLACE_WITH") === 0) {
+      qrEl.outerHTML =
         '<div style="width:280px;height:280px;display:flex;align-items:center;' +
         'justify-content:center;text-align:center;color:#0f1115;font-family:Inter,sans-serif;' +
-        'font-size:14px;padding:16px;">QR kodu yüklenemedi.<br>Linki yukarıdan aç.</div>';
+        'font-size:14px;padding:16px;">Sistem henüz bağlanmadı.<br>config.js ayarlanmamış.</div>';
+    } else {
+      setupGeo();
     }
   </script>
 </body>

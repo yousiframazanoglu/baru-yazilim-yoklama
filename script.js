@@ -5,8 +5,12 @@
   const submitBtn = document.getElementById("submitBtn");
   const output = document.getElementById("output");
   const statusDot = document.getElementById("statusDot");
+  const geoNote = document.getElementById("geoNote");
 
   const ENDPOINT = window.YOKLAMA_ENDPOINT || "";
+  const TOKEN = new URLSearchParams(window.location.search).get("t") || "";
+
+  let geo = { lat: null, lng: null };
 
   function setStatus(state) {
     statusDot.classList.remove("is-busy", "is-error");
@@ -74,6 +78,34 @@
     return v.trim().length >= 3;
   }
 
+  // Sayfa açılır açılmaz konum izni iste; öğrenci reddederse formu yine de
+  // dener, sunucu konum zorunluysa kendi mesajıyla reddeder.
+  function requestGeo() {
+    if (!navigator.geolocation) {
+      geoNote.textContent = "";
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        geo.lat = pos.coords.latitude;
+        geo.lng = pos.coords.longitude;
+      },
+      () => {
+        geoNote.textContent = "Konum paylaşılmadı — sınıf konum kontrolü açıksa gönderim reddedilebilir.";
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+  requestGeo();
+
+  if (!TOKEN) {
+    printLines([
+      { text: "✗ Bu sayfa QR kodu olmadan açılamaz.", cls: "err" },
+      { text: "  Projeksiyondaki güncel QR'ı okut.", cls: "sub" },
+    ]);
+    submitBtn.disabled = true;
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -108,27 +140,56 @@
     printLines([{ text: "Gönderiliyor…", cls: "sub" }]);
 
     try {
-      await fetch(ENDPOINT, {
+      const res = await fetch(ENDPOINT, {
         method: "POST",
-        mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ studentNo, fullName }),
+        body: JSON.stringify({
+          studentNo,
+          fullName,
+          token: TOKEN,
+          lat: geo.lat,
+          lng: geo.lng,
+        }),
       });
 
-      setStatus("idle");
-      printLines(
-        [
-          { text: `✓ Kayıt alındı — ${fullName} (${studentNo})`, cls: "ok" },
-          { text: "  Yoklamaya katıldın. Derse hoş geldin.", cls: "sub" },
-        ],
-        {
-          done: () => {
-            submitBtn.disabled = false;
-            form.reset();
-            studentNoInput.focus();
-          },
-        }
-      );
+      let result = null;
+      try {
+        result = JSON.parse(await res.text());
+      } catch (parseErr) {
+        result = null;
+      }
+
+      if (result && result.ok) {
+        setStatus("idle");
+        printLines(
+          [
+            { text: `✓ Kayıt alındı — ${fullName} (${studentNo})`, cls: "ok" },
+            { text: "  Yoklamaya katıldın. Derse hoş geldin.", cls: "sub" },
+          ],
+          {
+            done: () => {
+              submitBtn.disabled = false;
+              form.reset();
+              studentNoInput.focus();
+            },
+          }
+        );
+      } else if (result && result.error) {
+        setStatus("error");
+        printLines([
+          { text: `✗ ${result.error}`, cls: "err" },
+        ]);
+        submitBtn.disabled = false;
+      } else {
+        // Sunucudan okunabilir bir yanıt gelmedi (CORS/ağ nedeniyle olabilir) —
+        // istek muhtemelen ulaştı ama onay doğrulanamadı.
+        setStatus("idle");
+        printLines([
+          { text: `✓ Gönderildi — ${fullName} (${studentNo})`, cls: "ok" },
+          { text: "  Sunucudan onay alınamadı; emin değilsen hocana sor.", cls: "sub" },
+        ]);
+        submitBtn.disabled = false;
+      }
     } catch (err) {
       setStatus("error");
       printLines([
