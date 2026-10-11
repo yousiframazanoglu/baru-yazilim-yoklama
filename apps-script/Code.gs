@@ -36,7 +36,7 @@ var MAX_DISTANCE_M = 200;            // öğrenci, ekrandan en fazla bu kadar me
 // Kaptan paneline (panel.html) girmek için basit bir şifre. Bunu kendi
 // seçtiğin bir kelimeyle değiştir — bu, öğrencilerin paneli bulup elle
 // yoklama eklemesini engellemek için, gerçek bir güvenlik katmanı değil.
-var ADMIN_CODE = "CHANGE_ME";
+var ADMIN_CODE = "200423";
 
 function doPost(e) {
   try {
