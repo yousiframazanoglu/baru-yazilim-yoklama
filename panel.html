@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BARÜ Yazılım Birimi — Kaptan Paneli</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .panel-stage { max-width: 760px; }
+  .gate {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat {
+    background: #0c0e12;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat__n { font-family: var(--mono); font-size: 22px; font-weight: 700; }
+  .stat__label { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .session-bar {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .session-bar.on { color: #8fd98a; border-color: rgba(143, 217, 138, 0.3); }
+  .session-bar.off { color: var(--danger); border-color: rgba(255, 107, 107, 0.3); }
+  .cols { display: flex; flex-direction: column; gap: 18px; }
+  .col h2 {
+    font-family: var(--mono);
+    font-size: 14px;
+    margin: 0 0 8px;
+    color: var(--text);
+  }
+  .list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13.5px;
+    padding: 8px 10px;
+    background: #0c0e12;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .row .no { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+  .row .t { font-family: var(--mono); color: var(--cyan); font-size: 12px; white-space: nowrap; }
+  .empty-note { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+  .manual {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .manual input {
+    flex: 1;
+    min-width: 120px;
+    background: #0c0e12;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 9px 10px;
+  }
+  .manual button {
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 9px 14px;
+    font-family: var(--sans);
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .manual button:hover { border-color: var(--amber-dim); }
+</style>
+</head>
+<body>
+  <main class="stage panel-stage">
+    <div class="term" id="gateTerm">
+      <div class="term__bar">
+        <span class="term__tab">panel.sh</span>
+        <span class="term__status" id="statusDot"></span>
+      </div>
+      <div class="term__body">
+        <div id="gate" class="gate">
+          <div class="term__banner"><span class="term__prompt">$</span> ./panel --auth</div>
+          <input id="codeInput" class="field__input" type="password" placeholder="Kaptan kodu" autocomplete="off">
+          <button type="button" class="submit" id="gateBtn"><span class="submit__caret">▸</span> Giriş</button>
+          <div class="output" id="gateOutput"></div>
+        </div>
+
+        <div id="panel" style="display:none;">
+          <div class="session-bar" id="sessionBar">—</div>
+          <div class="summary">
+            <div class="stat"><div class="stat__n" id="presentCount">0</div><div class="stat__label">GELDİ</div></div>
+            <div class="stat"><div class="stat__n" id="absentCount">0</div><div class="stat__label">GELMEDİ</div></div>
+            <div class="stat"><div class="stat__n" id="rosterCount">0</div><div class="stat__label">TOPLAM LİSTE</div></div>
+          </div>
+
+          <div class="cols">
+            <div class="col">
+              <h2>✓ Geldi</h2>
+              <div class="list" id="presentList"></div>
+            </div>
+            <div class="col">
+              <h2>Gelmedi</h2>
+              <div class="list" id="absentList"></div>
+            </div>
+            <div class="col" id="unmatchedCol" style="display:none;">
+              <h2>⚠ Listede olmayan girişler</h2>
+              <div class="list" id="unmatchedList"></div>
+            </div>
+            <div class="col">
+              <h2>Elle ekle</h2>
+              <div class="manual">
+                <input id="manualNo" placeholder="Öğrenci No">
+                <input id="manualName" placeholder="Ad Soyad">
+                <button type="button" id="manualBtn">Ekle</button>
+              </div>
+              <div class="output" id="manualOutput"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="footnote">BARÜ Bilim ve Teknoloji Kulübü · Yazılım Birimi · sadece kaptan için</p>
+  </main>
+
+  <script src="config.js"></script>
+  <script>
+    const ENDPOINT = window.YOKLAMA_ENDPOINT || "";
+    const statusDot = document.getElementById("statusDot");
+    const gateEl = document.getElementById("gate");
+    const panelEl = document.getElementById("panel");
+    const gateOutput = document.getElementById("gateOutput");
+    const codeInput = document.getElementById("codeInput");
+
+    let code = sessionStorage.getItem("panelCode") || "";
+    let pollTimer = null;
+
+    function fmtTime(ms) {
+      const d = new Date(ms);
+      return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function renderList(el, items, kind) {
+      el.innerHTML = "";
+      if (!items.length) {
+        el.innerHTML = '<div class="empty-note">— yok —</div>';
+        return;
+      }
+      items.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        const label = document.createElement("span");
+        label.innerHTML = item.fullName + ' <span class="no">(' + item.studentNo + ')</span>';
+        row.appendChild(label);
+        if (kind === "present") {
+          const t = document.createElement("span");
+          t.className = "t";
+          t.textContent = fmtTime(item.timestamp) + (item.distance ? " · " + item.distance + "m" : "");
+          row.appendChild(t);
+        }
+        el.appendChild(row);
+      });
+    }
+
+    async function poll() {
+      if (!ENDPOINT || ENDPOINT.indexOf("REPLACE_WITH") === 0) return;
+      try {
+        const url = ENDPOINT + "?action=panelData&code=" + encodeURIComponent(code);
+        const res = await fetch(url);
+        const data = JSON.parse(await res.text());
+
+        if (!data.ok) {
+          stopAndShowGate(data.error || "Kod yanlış.");
+          return;
+        }
+
+        statusDot.classList.remove("is-error");
+        gateEl.style.display = "none";
+        panelEl.style.display = "block";
+
+        const bar = document.getElementById("sessionBar");
+        if (data.session && data.session.active) {
+          bar.className = "session-bar on";
+          bar.textContent = "✓ Oturum AÇIK · " + fmtTime(data.session.expiresAt) + "'a kadar" +
+            (data.session.geoEnabled ? " · konum kontrolü açık" : " · konum kontrolü kapalı");
+        } else {
+          bar.className = "session-bar off";
+          bar.textContent = "✗ Aktif oturum yok (goster.html açık değil)";
+        }
+
+        document.getElementById("presentCount").textContent = data.present.length;
+        document.getElementById("absentCount").textContent = data.absent.length;
+        document.getElementById("rosterCount").textContent = data.rosterCount;
+
+        renderList(document.getElementById("presentList"), data.present, "present");
+        renderList(document.getElementById("absentList"), data.absent, "absent");
+
+        const unmatchedCol = document.getElementById("unmatchedCol");
+        if (data.unmatched.length) {
+          unmatchedCol.style.display = "block";
+          renderList(document.getElementById("unmatchedList"), data.unmatched.map(u => ({
+            studentNo: u.studentNo, fullName: u.fullName, timestamp: u.timestamp
+          })), "present");
+        } else {
+          unmatchedCol.style.display = "none";
+        }
+      } catch (err) {
+        statusDot.classList.add("is-error");
+      }
+    }
+
+    function stopAndShowGate(message) {
+      if (pollTimer) clearInterval(pollTimer);
+      sessionStorage.removeItem("panelCode");
+      panelEl.style.display = "none";
+      gateEl.style.display = "flex";
+      gateOutput.innerHTML = '<span class="err">✗ ' + message + '</span>';
+    }
+
+    function startPolling() {
+      poll();
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(poll, 5000);
+    }
+
+    document.getElementById("gateBtn").addEventListener("click", () => {
+      code = codeInput.value.trim();
+      if (!code) return;
+      sessionStorage.setItem("panelCode", code);
+      startPolling();
+    });
+    codeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("gateBtn").click();
+    });
+
+    document.getElementById("manualBtn").addEventListener("click", async () => {
+      const studentNo = document.getElementById("manualNo").value.trim();
+      const fullName = document.getElementById("manualName").value.trim();
+      const out = document.getElementById("manualOutput");
+      if (!studentNo || !fullName) {
+        out.innerHTML = '<span class="err">✗ Öğrenci No ve Ad Soyad gerekli.</span>';
+        return;
+      }
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "manualAdd", code, studentNo, fullName }),
+        });
+        const data = JSON.parse(await res.text());
+        if (data.ok) {
+          out.innerHTML = '<span class="ok">✓ Eklendi.</span>';
+          document.getElementById("manualNo").value = "";
+          document.getElementById("manualName").value = "";
+          poll();
+        } else {
+          out.innerHTML = '<span class="err">✗ ' + (data.error || "Eklenemedi.") + '</span>';
+        }
+      } catch (err) {
+        out.innerHTML = '<span class="err">✗ Gönderilemedi.</span>';
+      }
+    });
+
+    if (code) {
+      startPolling();
+    }
+  </script>
+</body>
+</html>

@@ -7,6 +7,7 @@ Girişler doğrudan Google E-Tablolar'a yazılır; tablodaki haftalık/oturum he
 Sayfalar:
 - `index.html` — öğrencinin doldurduğu form (QR'ın açtığı sayfa)
 - `goster.html` — projeksiyonda gösterilecek büyük QR kodu
+- `panel.html` — **kaptan paneli**: canlı "kim geldi / gelmedi" listesi + elle ekleme
 - `apps-script/Code.gs` — Google E-Tablolar'a yazan arka uç
 
 ## Kurulum (tek seferlik, ~5 dakika)
@@ -24,6 +25,10 @@ Sayfalar:
    - **Erişebilenler:** Herkes
 8. **Dağıt**'a bas. Google seni yetkilendirme isteyebilir — kendi hesabınla onayla ("Gelişmiş" > "...'e git (güvenli değil)" uyarısı çıkarsa bu normal, kendi scriptin).
 9. Çıkan **Web uygulaması URL'si**ni kopyala (`https://script.google.com/macros/s/.../exec` şeklinde).
+
+**Not:** Kodun en üstünde `var ADMIN_CODE = "CHANGE_ME";` satırı var — bunu kendi
+seçtiğin bir kelime/şifreyle değiştir (kaydet + yeniden dağıt). Bu, kaptan
+panelini (`panel.html`) açabilmek ve elle yoklama ekleyebilmek için gereken kod.
 
 ### 2) Siteye URL'yi tanıt
 
@@ -59,6 +64,22 @@ Değiştirip kaydet, GitHub'a push et (veya Claude'a "URL'yi şuna güncelle" di
 
 Toplantıda `goster.html` sayfasını aç (`https://yousiframazanoglu.github.io/baru-yazilim-yoklama/goster.html`),
 büyük QR kodunu projektöre yansıt. Öğrenciler telefonla okutup formu doldurur.
+
+## Kaptan paneli
+
+`panel.html`'i kendi telefonundan/laptopundan aç
+(`https://yousiframazanoglu.github.io/baru-yazilim-yoklama/panel.html`), `ADMIN_CODE`'u gir.
+Ders boyunca 5 saniyede bir kendini yeniler ve gösterir:
+
+- **Geldi / Gelmedi**: roster'daki (`Yoklama!A7:B86`) herkesin bu oturumda yoklama
+  verip vermediği, canlı — dersin ortasında kimin hâlâ okutmadığını görürsün.
+- **Listede olmayan girişler**: roster'da eşleşmeyen bir öğrenci no ile gelen
+  kayıtlar (yazım hatası ya da yanlış no girmiş olabilir) ayrı gösterilir.
+- **Elle ekle**: telefonu olmayan/QR okutamayan bir öğrenciyi, token veya konum
+  kontrolüne takılmadan, kaptan yetkisiyle doğrudan ekler (`Form Yanıtları 1`'e
+  "ELLE" notuyla düşer).
+- Panelin linki öğrencilerle paylaşılmaz; `ADMIN_CODE` bunun tek korumasıdır,
+  gerçek bir giriş sistemi değildir — kimseyle paylaşma.
 
 ## Sahte yoklama koruması (linki arkadaşa atma sorunu)
 

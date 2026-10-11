@@ -26,9 +26,17 @@
 
 var SPREADSHEET_ID = "18wNqN0jXftRfkh99oOo6-9SgCw_l26DgvSMB4NCRvWo";
 var SHEET_NAME = "Form Yanıtları 1";
+var ROSTER_SHEET_NAME = "Yoklama";
+var ROSTER_FIRST_ROW = 7;
+var ROSTER_LAST_ROW = 86;
 
 var TOKEN_TTL_MS = 20 * 60 * 1000;   // bir QR en fazla 20 dakika geçerli
 var MAX_DISTANCE_M = 200;            // öğrenci, ekrandan en fazla bu kadar metre uzakta olabilir
+
+// Kaptan paneline (panel.html) girmek için basit bir şifre. Bunu kendi
+// seçtiğin bir kelimeyle değiştir — bu, öğrencilerin paneli bulup elle
+// yoklama eklemesini engellemek için, gerçek bir güvenlik katmanı değil.
+var ADMIN_CODE = "CHANGE_ME";
 
 function doPost(e) {
   try {
@@ -37,6 +45,9 @@ function doPost(e) {
     if (body.action === "startSession") {
       return handleStartSession(body);
     }
+    if (body.action === "manualAdd") {
+      return handleManualAdd(body);
+    }
 
     return handleAttendance(body);
   } catch (err) {
@@ -44,7 +55,13 @@ function doPost(e) {
   }
 }
 
-function doGet() {
+function doGet(e) {
+  var action = e && e.parameter && e.parameter.action;
+
+  if (action === "panelData") {
+    return handlePanelData(e.parameter);
+  }
+
   return ContentService
     .createTextOutput("BARÜ Yazılım Birimi yoklama servisi çalışıyor. Bu uç nokta sadece POST kabul eder.")
     .setMimeType(ContentService.MimeType.TEXT);
@@ -112,6 +129,120 @@ function handleAttendance(body) {
   sheet.appendRow([new Date(), studentNo, fullName, distanceNote]);
 
   return jsonOutput({ ok: true });
+}
+
+// Kaptan paneli kaydı: token/konum kontrolü atlanır ama ADMIN_CODE doğru
+// olmalı. "ELLE" notuyla kaydedilir, ki Form Yanıtları 1'de ayırt edilsin.
+function handleManualAdd(body) {
+  if (String(body.code || "") !== ADMIN_CODE) {
+    return jsonOutput({ ok: false, error: "Kod yanlış." });
+  }
+
+  var studentNo = String(body.studentNo || "").trim();
+  var fullName = String(body.fullName || "").trim();
+  if (!studentNo || !fullName) {
+    return jsonOutput({ ok: false, error: "studentNo ve fullName gerekli" });
+  }
+
+  var sheet = getOrCreateResponseSheet();
+  sheet.appendRow([new Date(), studentNo, fullName, "ELLE"]);
+
+  return jsonOutput({ ok: true });
+}
+
+// Kaptan paneli (panel.html) için: aktif oturumun durumu, bu oturumda
+// gelenler ve roster'daki gelmeyenler.
+function handlePanelData(params) {
+  if (String((params && params.code) || "") !== ADMIN_CODE) {
+    return jsonOutput({ ok: false, error: "Kod yanlış." });
+  }
+
+  var session = getActiveSession();
+  var sessionInfo = null;
+  var sessionStart = 0;
+
+  if (session) {
+    sessionStart = session.expiresAt - TOKEN_TTL_MS;
+    sessionInfo = {
+      active: Date.now() <= session.expiresAt,
+      expiresAt: session.expiresAt,
+      geoEnabled: session.lat !== null && session.lng !== null
+    };
+  }
+
+  var roster = getRoster();
+  var checkedIn = getCheckedInSince(sessionStart);
+
+  var checkedInNos = {};
+  checkedIn.forEach(function (row) {
+    checkedInNos[row.studentNo] = row;
+  });
+
+  var present = [];
+  var absent = [];
+  roster.forEach(function (student) {
+    if (checkedInNos[student.studentNo]) {
+      present.push({
+        studentNo: student.studentNo,
+        fullName: student.fullName,
+        timestamp: checkedInNos[student.studentNo].timestamp,
+        distance: checkedInNos[student.studentNo].distance
+      });
+    } else {
+      absent.push(student);
+    }
+  });
+
+  // Rosterda olmayan ama bu oturumda kayıt atmış (eşleşmeyen no) girişler.
+  var unmatched = checkedIn.filter(function (row) {
+    return !roster.some(function (s) { return s.studentNo === row.studentNo; });
+  });
+
+  return jsonOutput({
+    ok: true,
+    session: sessionInfo,
+    present: present,
+    absent: absent,
+    unmatched: unmatched,
+    rosterCount: roster.length
+  });
+}
+
+function getRoster() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName(ROSTER_SHEET_NAME);
+  if (!sheet) return [];
+
+  var numRows = ROSTER_LAST_ROW - ROSTER_FIRST_ROW + 1;
+  var values = sheet.getRange(ROSTER_FIRST_ROW, 1, numRows, 2).getValues();
+
+  var roster = [];
+  values.forEach(function (row) {
+    var studentNo = String(row[0] || "").trim();
+    var fullName = String(row[1] || "").trim();
+    if (studentNo) roster.push({ studentNo: studentNo, fullName: fullName });
+  });
+  return roster;
+}
+
+function getCheckedInSince(sinceMs) {
+  var sheet = getOrCreateResponseSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  var result = [];
+  values.forEach(function (row) {
+    var ts = row[0] instanceof Date ? row[0].getTime() : new Date(row[0]).getTime();
+    if (isNaN(ts) || ts < sinceMs) return;
+    result.push({
+      timestamp: ts,
+      studentNo: String(row[1] || "").trim(),
+      fullName: String(row[2] || "").trim(),
+      distance: String(row[3] || "")
+    });
+  });
+  return result;
 }
 
 function getActiveSession() {
