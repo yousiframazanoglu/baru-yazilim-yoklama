@@ -10,7 +10,7 @@
   const ENDPOINT = window.YOKLAMA_ENDPOINT || "";
   const TOKEN = new URLSearchParams(window.location.search).get("t") || "";
 
-  let geo = { lat: null, lng: null };
+  let geo = { lat: null, lng: null, accuracy: null };
 
   function setStatus(state) {
     statusDot.classList.remove("is-busy", "is-error");
@@ -89,6 +89,7 @@
       (pos) => {
         geo.lat = pos.coords.latitude;
         geo.lng = pos.coords.longitude;
+        geo.accuracy = pos.coords.accuracy;
       },
       () => {
         geoNote.textContent = "Konum paylaşılmadı — sınıf konum kontrolü açıksa gönderim reddedilebilir.";
@@ -149,6 +150,7 @@
           token: TOKEN,
           lat: geo.lat,
           lng: geo.lng,
+          accuracy: geo.accuracy,
         }),
       });
 

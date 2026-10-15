@@ -109,7 +109,7 @@
     var countdownEl = document.getElementById("countdown");
     var geoEl = document.getElementById("geo");
 
-    var session = { token: null, expiresAt: 0, lat: null, lng: null };
+    var session = { token: null, expiresAt: 0, lat: null, lng: null, accuracy: null };
     var countdownTimer = null;
 
     function baseUrl() {
@@ -151,7 +151,8 @@
             token: session.token,
             expiresAt: session.expiresAt,
             lat: session.lat,
-            lng: session.lng
+            lng: session.lng,
+            accuracy: session.accuracy
           })
         });
       } catch (err) {
@@ -199,12 +200,20 @@
         function (pos) {
           session.lat = pos.coords.latitude;
           session.lng = pos.coords.longitude;
-          geoEl.innerHTML = '<span class="on">✓ Konum kontrolü açık — öğrenciler sınıfın yakınında olmalı</span>';
+          session.accuracy = pos.coords.accuracy;
+          if (pos.coords.accuracy > 2000) {
+            geoEl.innerHTML = '<span class="off">✗ Konum çok kaba tahminli (±' + Math.round(pos.coords.accuracy) +
+              'm) — konum kontrolü bu oturum için kapalı</span>';
+          } else {
+            geoEl.innerHTML = '<span class="on">✓ Konum kontrolü açık (±' + Math.round(pos.coords.accuracy) +
+              'm) — öğrenciler sınıfın yakınında olmalı</span>';
+          }
           startNewSession();
         },
         function () {
           session.lat = null;
           session.lng = null;
+          session.accuracy = null;
           geoEl.innerHTML = '<span class="off">✗ Konum kontrolü kapalı (izin verilmedi) — bu ekrana konum izni ver</span>';
           startNewSession();
         },

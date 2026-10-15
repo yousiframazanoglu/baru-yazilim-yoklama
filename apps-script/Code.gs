@@ -22,6 +22,12 @@
  *   reddedilir — yani biri evden/uzaktan dolduramaz. Projeksiyon
  *   ekranı konum izni vermezse bu kontrol o oturum için otomatik
  *   devre dışı kalır (hata vermez, sadece korumasız olur).
+ * - Hem ekranın hem öğrencinin konumu tarayıcıdan geliyor ve "accuracy"
+ *   (tahmini hata payı) ile birlikte gönderiliyor. Masaüstü/laptop gibi
+ *   GPS'siz cihazlar Wi-Fi/IP üzerinden konum tahmin eder ve bu bazen
+ *   km'lerce yanılabilir — bu yüzden ekranın konumu MAX_ACCURACY_M'den
+ *   kaba çıkarsa o oturumda konum kontrolü hiç uygulanmaz; kaba değilse
+ *   bile iki tarafın hata payı MAX_DISTANCE_M'ye eklenip tolerans tanınır.
  */
 
 var SPREADSHEET_ID = "18wNqN0jXftRfkh99oOo6-9SgCw_l26DgvSMB4NCRvWo";
@@ -32,6 +38,7 @@ var ROSTER_LAST_ROW = 86;
 
 var TOKEN_TTL_MS = 20 * 60 * 1000;   // bir QR en fazla 20 dakika geçerli
 var MAX_DISTANCE_M = 200;            // öğrenci, ekrandan en fazla bu kadar metre uzakta olabilir
+var MAX_ACCURACY_M = 2000;           // ekranın konumu bundan daha kaba tahminliyse (ör. laptop Wi-Fi konumu), konum kontrolü o oturum için kapanır
 
 // Kaptan paneline (panel.html) girmek için basit bir şifre. Bunu kendi
 // seçtiğin bir kelimeyle değiştir — bu, öğrencilerin paneli bulup elle
@@ -79,13 +86,23 @@ function handleStartSession(body) {
 
   var lat = body.lat !== undefined && body.lat !== null && body.lat !== "" ? Number(body.lat) : null;
   var lng = body.lng !== undefined && body.lng !== null && body.lng !== "" ? Number(body.lng) : null;
+  var accuracy = body.accuracy !== undefined && body.accuracy !== null && body.accuracy !== "" ? Number(body.accuracy) : null;
+
+  // Ekranın konumu çok kaba tahminliyse (laptop/masaüstü genelde GPS'siz,
+  // Wi-Fi/IP üzerinden birkaç km yanılabilir) bu oturum için konum
+  // kontrolünü hiç devreye almıyoruz — yanlış reddetmek yerine.
+  if (accuracy !== null && !isNaN(accuracy) && accuracy > MAX_ACCURACY_M) {
+    lat = null;
+    lng = null;
+  }
 
   var props = PropertiesService.getScriptProperties();
   props.setProperties({
     SESSION_TOKEN: token,
     SESSION_EXPIRES: String(expiresAt),
     SESSION_LAT: lat === null || isNaN(lat) ? "" : String(lat),
-    SESSION_LNG: lng === null || isNaN(lng) ? "" : String(lng)
+    SESSION_LNG: lng === null || isNaN(lng) ? "" : String(lng),
+    SESSION_ACCURACY: accuracy === null || isNaN(accuracy) ? "" : String(accuracy)
   });
 
   return jsonOutput({ ok: true });
@@ -97,6 +114,7 @@ function handleAttendance(body) {
   var token = String(body.token || "").trim();
   var lat = body.lat !== undefined && body.lat !== null && body.lat !== "" ? Number(body.lat) : null;
   var lng = body.lng !== undefined && body.lng !== null && body.lng !== "" ? Number(body.lng) : null;
+  var accuracy = body.accuracy !== undefined && body.accuracy !== null && body.accuracy !== "" ? Number(body.accuracy) : null;
 
   if (!studentNo || !fullName) {
     return jsonOutput({ ok: false, error: "studentNo ve fullName gerekli" });
@@ -119,7 +137,12 @@ function handleAttendance(body) {
       return jsonOutput({ ok: false, error: "Konum izni gerekli. Tarayıcıda konuma izin verip tekrar dene." });
     }
     var dist = distanceMeters(lat, lng, session.lat, session.lng);
-    if (dist > MAX_DISTANCE_M) {
+    // İkisinin de tarayıcı konum doğruluğuna (accuracy) tolerans tanı; iki
+    // konumun kendi hata payı kadar birbirine yakın olması yeterli sayılır.
+    var studentAccuracy = accuracy !== null && !isNaN(accuracy) ? Math.min(accuracy, 300) : 0;
+    var sessionAccuracy = session.accuracy !== null ? Math.min(session.accuracy, 300) : 0;
+    var effectiveMax = MAX_DISTANCE_M + studentAccuracy + sessionAccuracy;
+    if (dist > effectiveMax) {
       return jsonOutput({ ok: false, error: "Sınıfın yakınında görünmüyorsun. Yoklama sadece dersteyken alınır." });
     }
     distanceNote = String(Math.round(dist));
@@ -253,12 +276,14 @@ function getActiveSession() {
 
   var latStr = props.getProperty("SESSION_LAT");
   var lngStr = props.getProperty("SESSION_LNG");
+  var accStr = props.getProperty("SESSION_ACCURACY");
 
   return {
     token: token,
     expiresAt: expiresAt,
     lat: latStr ? Number(latStr) : null,
-    lng: lngStr ? Number(lngStr) : null
+    lng: lngStr ? Number(lngStr) : null,
+    accuracy: accStr ? Number(accStr) : null
   };
 }
 

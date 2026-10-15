@@ -103,6 +103,14 @@ tek kullanımlık "oturum" başlatır:
 - Projeksiyon ekranının (bilgisayar/tabletin) konum iznini açık tutman,
   korumanın çalışması için önemli — tarayıcıda site ayarlarından "Konum: İzin ver"
   yapman yeterli.
+- **"Yakınımdayım ama uzak diyor" sorunu**: GPS'siz bir laptop/masaüstünde
+  `goster.html` açıksa, tarayıcı konumu Wi-Fi/IP üzerinden tahmin eder ve bu
+  bazen birkaç km yanılabilir. Sistem artık bunu `accuracy` değerine bakarak
+  kendi kendine tolere ediyor: tahmin çok kabaysa (`MAX_ACCURACY_M`, varsayılan
+  2000m) o oturum için konum kontrolü otomatik kapanır. `goster.html`'in
+  altındaki "✓/✗ Konum kontrolü" satırında (± kaç metre) yazdığını görebilirsin.
+  Hâlâ sorun yaşıyorsan en güvenilir yol: `goster.html`'i bir telefon/tabletten
+  (GPS'li bir cihazdan) açmak.
 - Öğrenciye gösterilen hata mesajları (`QR süresi doldu`, `Sınıfın yakınında
   görünmüyorsun` vb.) doğrudan bu kontrollerden gelir.
 
